@@ -78,6 +78,12 @@ cfg_if::cfg_if! {
                 Self::crossterm().unwrap()
             }
        }
+    } else if #[cfg(feature = "terminal-backend")] {
+        impl Default for Cursive {
+            fn default() -> Self {
+                Self::terminal().unwrap()
+            }
+       }
     } else if #[cfg(feature = "pancurses-backend")] {
         impl Default for Cursive {
             fn default() -> Self {
@@ -172,6 +178,12 @@ impl Cursive {
     #[cfg(feature = "crossterm-backend")]
     pub fn crossterm() -> std::io::Result<Self> {
         Self::try_new(backend::crossterm::Backend::init)
+    }
+
+    /// Creates a new Cursive root using a crossterm backend.
+    #[cfg(feature = "terminal-backend")]
+    pub fn terminal() -> std::io::Result<Self> {
+        Self::try_new(backend::terminal::Backend::init)
     }
 
     /// Creates a new Cursive root using a bear-lib-terminal backend.

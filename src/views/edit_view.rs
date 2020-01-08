@@ -3,8 +3,8 @@ use crate::event::{Callback, Event, EventResult, Key, MouseEvent};
 use crate::rect::Rect;
 use crate::theme::{ColorStyle, Effect};
 use crate::utils::lines::simple::{simple_prefix, simple_suffix};
-use crate::vec::Vec2;
 use crate::view::View;
+use crate::Vec2;
 use crate::{Cursive, Printer, With};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,7 +34,6 @@ pub type OnSubmit = dyn Fn(&mut Cursive, &str);
 /// # use cursive::Cursive;
 /// # use cursive::traits::*;
 /// # use cursive::views::{Dialog, EditView, TextView};
-/// # fn main() {
 /// let mut siv = Cursive::dummy();
 ///
 /// // Create a dialog with an edit text and a button.
@@ -47,11 +46,11 @@ pub type OnSubmit = dyn Fn(&mut Cursive, &str);
 ///         .content(
 ///             EditView::new()
 ///                 .on_submit(show_popup)
-///                 .with_id("name")
+///                 .with_name("name")
 ///                 .fixed_width(20),
 ///         )
 ///         .button("Ok", |s| {
-///             let name = s.call_on_id(
+///             let name = s.call_on_name(
 ///                 "name",
 ///                 |view: &mut EditView| view.get_content(),
 ///             ).unwrap();
@@ -69,8 +68,6 @@ pub type OnSubmit = dyn Fn(&mut Cursive, &str);
 ///             .button("Quit", |s| s.quit()));
 ///     }
 /// }
-///
-/// # }
 /// ```
 pub struct EditView {
     /// Current content.
@@ -268,6 +265,20 @@ impl EditView {
     /// Sets a callback to be called whenever the content is modified.
     ///
     /// Chainable variant. See [`set_on_edit`](#method.set_on_edit).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::{TextContent, TextView, EditView};
+    /// // Keep the length of the text in a separate view.
+    /// let mut content = TextContent::new("0");
+    /// let text_view = TextView::new_with_content(content.clone());
+    ///
+    /// let on_edit = EditView::new()
+    ///             .on_edit(move |_s, text, _cursor| {
+    ///                 content.set_content(format!("{}", text.len()));
+    ///             });
+    /// ```
     pub fn on_edit<F>(self, callback: F) -> Self
     where
         F: Fn(&mut Cursive, &str, usize) + 'static,
@@ -328,6 +339,17 @@ impl EditView {
     /// Sets a callback to be called when `<Enter>` is pressed.
     ///
     /// Chainable variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::{Dialog, EditView};
+    ///
+    /// let edit_view = EditView::new()
+    ///     .on_submit(|s, text| {
+    ///         s.add_layer(Dialog::info(text));
+    ///     });
+    /// ```
     pub fn on_submit<F>(self, callback: F) -> Self
     where
         F: Fn(&mut Cursive, &str) + 'static,

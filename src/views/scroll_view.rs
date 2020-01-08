@@ -11,17 +11,7 @@ pub struct ScrollView<V> {
     core: scroll::Core,
 }
 
-impl<V> scroll::Scroller for ScrollView<V>
-where
-    V: View,
-{
-    fn get_scroller(&self) -> &scroll::Core {
-        &self.core
-    }
-    fn get_scroller_mut(&mut self) -> &mut scroll::Core {
-        &mut self.core
-    }
-}
+impl_scroller!(ScrollView<V>::core);
 
 impl<V> ScrollView<V>
 where
@@ -163,6 +153,12 @@ where
     /// Programmatically scroll to the rightmost side of the view.
     pub fn scroll_to_right(&mut self) {
         self.core.scroll_to_right();
+    }
+
+    /// Programmatically scroll until the child's important area is in view.
+    pub fn scroll_to_important_area(&mut self) {
+        let important_area = self.inner.important_area(self.core.last_size());
+        self.core.scroll_to_rect(important_area);
     }
 
     /// Returns the wrapped view.

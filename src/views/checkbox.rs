@@ -1,14 +1,23 @@
 use crate::direction::Direction;
 use crate::event::{Event, EventResult, Key, MouseButton, MouseEvent};
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::View;
 use crate::Cursive;
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use std::rc::Rc;
 
 /// Checkable box.
+///
+/// # Examples
+///
+/// ```
+/// use cursive::views::Checkbox;
+/// use cursive::traits::Identifiable;
+///
+/// let checkbox = Checkbox::new().checked().with_name("check");
+/// ```
 pub struct Checkbox {
     checked: bool,
     enabled: bool,
@@ -32,7 +41,8 @@ impl Checkbox {
 
     /// Sets a callback to be used when the state changes.
     pub fn set_on_change<F: 'static + Fn(&mut Cursive, bool)>(
-        &mut self, on_change: F,
+        &mut self,
+        on_change: F,
     ) {
         self.on_change = Some(Rc::new(on_change));
     }
@@ -41,7 +51,8 @@ impl Checkbox {
     ///
     /// Chainable variant.
     pub fn on_change<F: 'static + Fn(&mut Cursive, bool)>(
-        self, on_change: F,
+        self,
+        on_change: F,
     ) -> Self {
         self.with(|s| s.set_on_change(on_change))
     }
@@ -67,6 +78,18 @@ impl Checkbox {
     }
 
     /// Returns `true` if the checkbox is checked.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Checkbox;
+    ///
+    /// let mut checkbox = Checkbox::new().checked();
+    /// assert!(checkbox.is_checked());
+    ///
+    /// checkbox.uncheck();
+    /// assert!(!checkbox.is_checked());
+    /// ```
     pub fn is_checked(&self) -> bool {
         self.checked
     }

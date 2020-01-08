@@ -1,10 +1,12 @@
 use super::Color;
 use enum_map::{enum_map, Enum, EnumMap};
+#[cfg(feature = "toml")]
 use log::warn;
-use toml;
 
-use hashbrown::HashMap;
 use std::ops::{Index, IndexMut};
+
+// Use AHash instead of the slower SipHash
+type HashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
 
 /// Color configuration for the application.
 ///
@@ -125,7 +127,9 @@ impl Palette {
 
     /// Adds a color namespace to this palette.
     pub fn add_namespace(
-        &mut self, key: &str, namespace: HashMap<String, PaletteNode>,
+        &mut self,
+        key: &str,
+        namespace: HashMap<String, PaletteNode>,
     ) {
         self.custom
             .insert(key.to_string(), PaletteNode::Namespace(namespace));
@@ -139,7 +143,7 @@ impl Palette {
 /// * `View` => `Dark(White)`
 /// * `Primary` => `Dark(Black)`
 /// * `Secondary` => `Dark(Blue)`
-/// * `Tertiary` => `Dark(White)`
+/// * `Tertiary` => `Light(White)`
 /// * `TitlePrimary` => `Dark(Red)`
 /// * `TitleSecondary` => `Dark(Yellow)`
 /// * `Highlight` => `Dark(Red)`
@@ -157,18 +161,19 @@ impl Default for Palette {
                 View => Dark(White),
                 Primary => Dark(Black),
                 Secondary => Dark(Blue),
-                Tertiary => Dark(White),
+                Tertiary => Light(White),
                 TitlePrimary => Dark(Red),
-                TitleSecondary => Dark(Yellow),
+                TitleSecondary => Light(Blue),
                 Highlight => Dark(Red),
                 HighlightInactive => Dark(Blue),
             },
-            custom: HashMap::new(),
+            custom: HashMap::default(),
         }
     }
 }
 
 // Iterate over a toml
+#[cfg(feature = "toml")]
 fn iterate_toml<'a>(
     table: &'a toml::value::Table,
 ) -> impl Iterator<Item = (&'a str, PaletteNode)> + 'a {
@@ -212,6 +217,7 @@ fn iterate_toml<'a>(
 }
 
 /// Fills `palette` with the colors from the given `table`.
+#[cfg(feature = "toml")]
 pub(crate) fn load_toml(palette: &mut Palette, table: &toml::value::Table) {
     // TODO: use serde for that?
     // Problem: toml-rs doesn't do well with Enums...

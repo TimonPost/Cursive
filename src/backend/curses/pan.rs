@@ -2,17 +2,19 @@
 use log::{debug, warn};
 use pancurses;
 
-use hashbrown::HashMap;
 use std::cell::{Cell, RefCell};
 use std::io::{stdout, Write};
 
 use crate::backend;
 use crate::event::{Event, Key, MouseButton, MouseEvent};
 use crate::theme::{Color, ColorPair, Effect};
-use crate::vec::Vec2;
+use crate::Vec2;
 
 use self::pancurses::mmask_t;
 use super::split_i32;
+
+// Use AHash instead of the slower SipHash
+type HashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
 
 /// Backend using pancurses.
 pub struct Backend {
@@ -70,12 +72,13 @@ impl Backend {
         // This asks the terminal to provide us with mouse drag events
         // (Mouse move when a button is pressed).
         // Replacing 1002 with 1003 would give us ANY mouse move.
+        #[cfg(not(windows))]
         print!("\x1B[?1002h");
         stdout().flush()?;
 
         let c = Backend {
             current_style: Cell::new(ColorPair::from_256colors(0, 0)),
-            pairs: RefCell::new(HashMap::new()),
+            pairs: RefCell::new(HashMap::default()),
             key_codes: initialize_keymap(),
             last_mouse_button: None,
             input_buffer: None,
@@ -87,7 +90,9 @@ impl Backend {
 
     /// Save a new color pair.
     fn insert_color(
-        &self, pairs: &mut HashMap<(i16, i16), i32>, (front, back): (i16, i16),
+        &self,
+        pairs: &mut HashMap<(i16, i16), i32>,
+        (front, back): (i16, i16),
     ) -> i32 {
         let n = 1 + pairs.len() as i32;
 
@@ -388,6 +393,7 @@ impl backend::Backend for Backend {
             Effect::Reverse => pancurses::Attribute::Reverse,
             Effect::Bold => pancurses::Attribute::Bold,
             Effect::Italic => pancurses::Attribute::Italic,
+            Effect::Strikethrough => pancurses::Attribute::Strikeout,
             Effect::Underline => pancurses::Attribute::Underline,
         };
         self.window.attron(style);
@@ -399,6 +405,7 @@ impl backend::Backend for Backend {
             Effect::Reverse => pancurses::Attribute::Reverse,
             Effect::Bold => pancurses::Attribute::Bold,
             Effect::Italic => pancurses::Attribute::Italic,
+            Effect::Strikethrough => pancurses::Attribute::Strikeout,
             Effect::Underline => pancurses::Attribute::Underline,
         };
         self.window.attroff(style);
@@ -526,7 +533,7 @@ fn get_mouse_button(bare_event: mmask_t) -> MouseButton {
 }
 
 fn initialize_keymap() -> HashMap<i32, Event> {
-    let mut map = HashMap::new();
+    let mut map = HashMap::default();
 
     super::fill_key_codes(&mut map, pancurses::keyname);
 

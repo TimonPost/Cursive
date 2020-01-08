@@ -19,7 +19,7 @@ use crossbeam_channel::{self, select, Receiver};
 use crate::backend;
 use crate::event::{Event, Key, MouseButton, MouseEvent};
 use crate::theme;
-use crate::vec::Vec2;
+use crate::Vec2;
 
 use std::cell::{Cell, RefCell};
 use std::fs::File;
@@ -223,6 +223,7 @@ impl backend::Backend for Backend {
             theme::Effect::Reverse => self.write(tstyle::Invert),
             theme::Effect::Bold => self.write(tstyle::Bold),
             theme::Effect::Italic => self.write(tstyle::Italic),
+            theme::Effect::Strikethrough => self.write(tstyle::CrossedOut),
             theme::Effect::Underline => self.write(tstyle::Underline),
         }
     }
@@ -231,8 +232,9 @@ impl backend::Backend for Backend {
         match effect {
             theme::Effect::Simple => (),
             theme::Effect::Reverse => self.write(tstyle::NoInvert),
-            theme::Effect::Bold => self.write(tstyle::NoBold),
+            theme::Effect::Bold => self.write(tstyle::NoFaint),
             theme::Effect::Italic => self.write(tstyle::NoItalic),
+            theme::Effect::Strikethrough => self.write(tstyle::NoCrossedOut),
             theme::Effect::Underline => self.write(tstyle::NoUnderline),
         }
     }

@@ -2,7 +2,6 @@
 use log::{debug, warn};
 use ncurses;
 
-use hashbrown::HashMap;
 use std::cell::{Cell, RefCell};
 use std::ffi::CString;
 use std::fs::File;
@@ -15,10 +14,13 @@ use crate::backend;
 use crate::event::{Event, Key, MouseButton, MouseEvent};
 use crate::theme::{Color, ColorPair, Effect};
 use crate::utf8;
-use crate::vec::Vec2;
+use crate::Vec2;
 
 use self::super::split_i32;
 use self::ncurses::mmask_t;
+
+// Use AHash instead of the slower SipHash
+type HashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
 
 /// Backend using ncurses.
 pub struct Backend {
@@ -117,7 +119,7 @@ impl Backend {
 
         let c = Backend {
             current_style: Cell::new(ColorPair::from_256colors(0, 0)),
-            pairs: RefCell::new(HashMap::new()),
+            pairs: RefCell::new(HashMap::default()),
             key_codes: initialize_keymap(),
             last_mouse_button: None,
             input_buffer: None,
@@ -128,7 +130,9 @@ impl Backend {
 
     /// Save a new color pair.
     fn insert_color(
-        &self, pairs: &mut HashMap<(i16, i16), i16>, (front, back): (i16, i16),
+        &self,
+        pairs: &mut HashMap<(i16, i16), i16>,
+        (front, back): (i16, i16),
     ) -> i16 {
         let n = 1 + pairs.len() as i16;
 
@@ -153,13 +157,8 @@ impl Backend {
 
         // Find if we have this color in stock
         let result = find_closest_pair(pair);
-        let lookup = pairs.get(&result);
-        if lookup.is_some() {
-            // We got it!
-            *lookup.unwrap()
-        } else {
-            self.insert_color(&mut *pairs, result)
-        }
+        let lookup = pairs.get(&result).copied();
+        lookup.unwrap_or_else(|| self.insert_color(&mut *pairs, result))
     }
 
     fn set_colors(&self, pair: ColorPair) {
@@ -343,6 +342,7 @@ impl backend::Backend for Backend {
             Effect::Simple => ncurses::A_NORMAL(),
             Effect::Bold => ncurses::A_BOLD(),
             Effect::Italic => ncurses::A_ITALIC(),
+            Effect::Strikethrough => ncurses::A_NORMAL(),
             Effect::Underline => ncurses::A_UNDERLINE(),
         };
         ncurses::attron(style);
@@ -354,6 +354,7 @@ impl backend::Backend for Backend {
             Effect::Simple => ncurses::A_NORMAL(),
             Effect::Bold => ncurses::A_BOLD(),
             Effect::Italic => ncurses::A_ITALIC(),
+            Effect::Strikethrough => ncurses::A_NORMAL(),
             Effect::Underline => ncurses::A_UNDERLINE(),
         };
         ncurses::attroff(style);
@@ -459,7 +460,8 @@ where
 
 fn initialize_keymap() -> HashMap<i32, Event> {
     // First, define the static mappings.
-    let mut map = HashMap::new();
+    let mut map = HashMap::default();
+
     // Value sent by ncurses when nothing happens
     map.insert(-1, Event::Refresh);
 

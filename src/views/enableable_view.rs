@@ -1,10 +1,31 @@
 use crate::event::{Event, EventResult};
 use crate::view::{View, ViewWrapper};
-use crate::{Printer, With};
+use crate::Printer;
 
 /// Wrapper around another view that can be enabled/disabled at will.
 ///
 /// When disabled, all child views will be disabled and will stop receiving events.
+///
+/// # Examples
+///
+/// ```
+/// use cursive::Cursive;
+/// use cursive::views::{Button, EnableableView, Checkbox, LinearLayout};
+/// use cursive::traits::Identifiable;
+///
+/// let mut siv = Cursive::dummy();
+///
+/// siv.add_layer(LinearLayout::vertical()
+///     .child(EnableableView::new(Checkbox::new()).with_name("my_view"))
+///     .child(Button::new("Toggle", |s| {
+///         s.call_on_name("my_view", |v: &mut EnableableView<Checkbox>| {
+///             // This will disable (or re-enable) the checkbox, preventing the user from
+///             // interacting with it.
+///             v.set_enabled(!v.is_enabled());
+///         });
+///     }))
+/// );
+/// ```
 pub struct EnableableView<V> {
     view: V,
     enabled: bool,
@@ -22,6 +43,7 @@ impl<V> EnableableView<V> {
     }
 
     impl_enabled!(self.enabled);
+    inner_getters!(self.view: V);
 }
 
 impl<V: View> ViewWrapper for EnableableView<V> {

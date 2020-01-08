@@ -3,8 +3,8 @@ use crate::direction::Direction;
 use crate::event::*;
 use crate::rect::Rect;
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::View;
+use crate::Vec2;
 use crate::{Cursive, Printer, With};
 use unicode_width::UnicodeWidthStr;
 
@@ -15,7 +15,8 @@ use unicode_width::UnicodeWidthStr;
 /// # Examples
 ///
 /// ```
-/// # use cursive::views::Button;
+/// use cursive::views::Button;
+///
 /// let quit_button = Button::new("Quit", |s| s.quit());
 /// ```
 pub struct Button {
@@ -39,6 +40,14 @@ impl Button {
     }
 
     /// Creates a new button without angle brackets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Button;
+    ///
+    /// let button = Button::new_raw("[ Quit ]", |s| s.quit());
+    /// ```
     pub fn new_raw<F, S: Into<String>>(label: S, cb: F) -> Self
     where
         F: 'static + Fn(&mut Cursive),
@@ -109,6 +118,15 @@ impl Button {
     /// Sets the label to the given value.
     ///
     /// This will include brackets.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Button;
+    ///
+    /// let mut button = Button::new("Quit", |s| s.quit());
+    /// button.set_label("Escape");
+    /// ```
     pub fn set_label<S>(&mut self, label: S)
     where
         S: Into<String>,

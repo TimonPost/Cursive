@@ -3,11 +3,11 @@ use crate::event::*;
 use crate::menu::{MenuItem, MenuTree};
 use crate::rect::Rect;
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::{Position, View};
 use crate::views::{MenuPopup, OnEventView};
 use crate::Cursive;
 use crate::Printer;
+use crate::Vec2;
 use std::rc::Rc;
 use unicode_width::UnicodeWidthStr;
 
@@ -31,7 +31,7 @@ enum State {
 /// The [`Cursive`] root already includes a menubar
 /// that you just need to configure.
 ///
-/// [`Cursive`]: ../struct.Cursive.html#method.menubar
+/// [`Cursive`]: crate::Cursive::menubar
 pub struct Menubar {
     /// Menu items in this menubar.
     root: MenuTree,
@@ -107,7 +107,10 @@ impl Menubar {
 
     /// Insert a new item at the given position.
     pub fn insert_subtree<S>(
-        &mut self, i: usize, title: S, menu: MenuTree,
+        &mut self,
+        i: usize,
+        title: S,
+        menu: MenuTree,
     ) -> &mut Self
     where
         S: Into<String>,

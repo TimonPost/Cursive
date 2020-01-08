@@ -1,7 +1,7 @@
-use crate::vec::Vec2;
 use crate::view::{View, ViewWrapper};
-use crate::views::IdView;
+use crate::views::NamedView;
 use crate::Printer;
+use crate::Vec2;
 use std::cell::Cell;
 
 /// Wrapper around a view that remembers its position.
@@ -26,9 +26,15 @@ impl<T: View> TrackedView<T> {
         }
     }
 
-    /// Wraps itself in a `IdView` for easy retrieval.
-    pub fn with_id(self, id: &str) -> IdView<Self> {
-        IdView::new(id, self)
+    /// Same as [`with_name`](TrackedView::with_name)
+    #[deprecated(note = "`with_id` is being renamed to `with_name`")]
+    pub fn with_id(self, id: &str) -> NamedView<Self> {
+        self.with_name(id)
+    }
+
+    /// Wraps itself in a `NamedView` for easy retrieval.
+    pub fn with_name(self, name: &str) -> NamedView<Self> {
+        NamedView::new(name, self)
     }
 
     inner_getters!(self.view: T);

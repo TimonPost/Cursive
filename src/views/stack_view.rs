@@ -1,12 +1,12 @@
 use crate::direction::Direction;
 use crate::event::{AnyCb, Event, EventResult};
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::{
     IntoBoxedView, Offset, Position, Selector, View, ViewWrapper,
 };
-use crate::views::{CircularFocus, Layer, ShadowView, ViewBox};
+use crate::views::{BoxedView, CircularFocus, Layer, ShadowView};
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use std::cell;
 use std::ops::Deref;
@@ -42,7 +42,10 @@ pub enum LayerPosition {
 
 impl Placement {
     pub fn compute_offset<S, A, P>(
-        &self, size: S, available: A, parent: P,
+        &self,
+        size: S,
+        available: A,
+        parent: P,
     ) -> Vec2
     where
         S: Into<Vec2>,
@@ -169,7 +172,9 @@ impl<T: View> View for ChildWrapper<T> {
     }
 
     fn call_on_any<'a>(
-        &mut self, selector: &Selector<'_>, callback: AnyCb<'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         match *self {
             ChildWrapper::Shadow(ref mut v) => {
@@ -194,7 +199,7 @@ impl<T: View> View for ChildWrapper<T> {
 }
 
 struct Child {
-    view: ChildWrapper<ViewBox>,
+    view: ChildWrapper<BoxedView>,
     size: Vec2,
     placement: Placement,
 
@@ -245,7 +250,7 @@ impl StackView {
     where
         T: IntoBoxedView,
     {
-        let boxed = ViewBox::boxed(view);
+        let boxed = BoxedView::boxed(view);
         self.layers.push(Child {
             view: ChildWrapper::Backfilled(Layer::new(
                 CircularFocus::wrap_tab(boxed),
@@ -290,12 +295,12 @@ impl StackView {
         })
     }
 
-    /// Looks for the layer containing a view with the given ID.
+    /// Looks for the layer containing a view with the given name.
     ///
-    /// Returns `Some(pos)` if `self.get(pos)` has the given ID,
-    /// or is a parent of a view with this ID.
+    /// Returns `Some(pos)` if `self.get(pos)` has the given name,
+    /// or is a parent of a view with this name.
     ///
-    /// Returns `None` if the given ID is not found.
+    /// Returns `None` if the given name is not found.
     ///
     /// Note that the returned position may be invalidated if some layers are
     /// removed from the view.
@@ -305,29 +310,33 @@ impl StackView {
     /// ```rust
     /// # use cursive::views::{TextView, StackView, Dialog, LayerPosition};
     /// # use cursive::view::Identifiable;
-    /// # fn main() {
     /// let mut stack = StackView::new();
     /// stack.add_layer(TextView::new("Back"));
-    /// stack.add_layer(Dialog::around(TextView::new("Middle").with_id("text")));
+    /// stack.add_layer(Dialog::around(TextView::new("Middle").with_name("text")));
     /// stack.add_layer(TextView::new("Front"));
     ///
-    /// assert_eq!(stack.find_layer_from_id("text"), Some(LayerPosition::FromBack(1)));
-    /// # }
+    /// assert_eq!(stack.find_layer_from_name("text"), Some(LayerPosition::FromBack(1)));
     /// ```
-    pub fn find_layer_from_id(&mut self, id: &str) -> Option<LayerPosition> {
-        let selector = Selector::Id(id);
+    pub fn find_layer_from_name(&mut self, id: &str) -> Option<LayerPosition> {
+        let selector = Selector::Name(id);
 
         for (i, child) in self.layers.iter_mut().enumerate() {
             let mut found = false;
-            child
-                .view
-                .call_on_any(&selector, Box::new(|_| found = true));
+            child.view.call_on_any(&selector, &mut |_| found = true);
             if found {
                 return Some(LayerPosition::FromBack(i));
             }
         }
 
         None
+    }
+
+    /// Same as [`find_layer_from_name`](StackView::find_layer_from_name).
+    #[deprecated(
+        note = "`find_layer_from_id` is being renamed to `find_layer_from_name`"
+    )]
+    pub fn find_layer_from_id(&mut self, id: &str) -> Option<LayerPosition> {
+        self.find_layer_from_name(id)
     }
 
     /// Adds a new full-screen layer on top of the stack.
@@ -355,7 +364,7 @@ impl StackView {
     where
         T: IntoBoxedView,
     {
-        let boxed = ViewBox::boxed(view);
+        let boxed = BoxedView::boxed(view);
         self.layers.push(Child {
             // Skip padding for absolute/parent-placed views
             view: ChildWrapper::Shadow(
@@ -382,7 +391,7 @@ impl StackView {
     where
         T: IntoBoxedView,
     {
-        let boxed = ViewBox::boxed(view);
+        let boxed = BoxedView::boxed(view);
         self.layers.push(Child {
             view: ChildWrapper::Plain(CircularFocus::wrap_tab(boxed)),
             size: Vec2::new(0, 0),
@@ -418,7 +427,7 @@ impl StackView {
             .pop()
             .map(|child| child.view)
             .map(ChildWrapper::unwrap)
-            .map(ViewBox::unwrap)
+            .map(BoxedView::unwrap)
     }
 
     /// Computes the offset of the current top view.
@@ -490,7 +499,9 @@ impl StackView {
     ///
     /// If `layer` is out of bounds.
     pub fn reposition_layer(
-        &mut self, layer: LayerPosition, position: Position,
+        &mut self,
+        layer: LayerPosition,
+        position: Position,
     ) {
         let i = self.get_index(layer).unwrap();
         let child = &mut self.layers[i];
@@ -659,12 +670,12 @@ impl View for StackView {
     }
 
     fn call_on_any<'a>(
-        &mut self, selector: &Selector<'_>, mut callback: AnyCb<'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         for layer in &mut self.layers {
-            layer
-                .view
-                .call_on_any(selector, Box::new(|any| callback(any)));
+            layer.view.call_on_any(selector, callback);
         }
     }
 

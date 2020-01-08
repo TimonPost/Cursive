@@ -1,18 +1,16 @@
 use crate::direction;
 use crate::event::{AnyCb, Callback, Event, EventResult, Key};
 use crate::rect::Rect;
-use crate::vec::Vec2;
-use crate::view::{Selector, View};
+use crate::view::{IntoBoxedView, Selector, View};
 use crate::Cursive;
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use log::debug;
 use std::rc::Rc;
 use unicode_width::UnicodeWidthStr;
 
 /// Represents a child from a [`ListView`].
-///
-/// [`ListView`]: struct.ListView.html
 pub enum ListChild {
     /// A single row, with a label and a view.
     Row(String, Box<dyn View>),
@@ -90,10 +88,14 @@ impl ListView {
     }
 
     /// Adds a view to the end of the list.
-    pub fn add_child<V: View + 'static>(&mut self, label: &str, mut view: V) {
+    pub fn add_child<V: IntoBoxedView + 'static>(
+        &mut self,
+        label: &str,
+        view: V,
+    ) {
+        let mut view = view.as_boxed_view();
         view.take_focus(direction::Direction::none());
-        self.children
-            .push(ListChild::Row(label.to_string(), Box::new(view)));
+        self.children.push(ListChild::Row(label.to_string(), view));
     }
 
     /// Removes all children from this view.
@@ -105,7 +107,11 @@ impl ListView {
     /// Adds a view to the end of the list.
     ///
     /// Chainable variant.
-    pub fn child<V: View + 'static>(self, label: &str, view: V) -> Self {
+    pub fn child<V: IntoBoxedView + 'static>(
+        self,
+        label: &str,
+        view: V,
+    ) -> Self {
         self.with(|s| s.add_child(label, view))
     }
 
@@ -119,6 +125,15 @@ impl ListView {
     /// Chainable variant.
     pub fn delimiter(self) -> Self {
         self.with(Self::add_delimiter)
+    }
+
+    /// Removes a child from the view.
+    ///
+    /// # Panics
+    ///
+    /// If `index >= self.len()`.
+    pub fn remove_child(&mut self, index: usize) -> ListChild {
+        self.children.remove(index)
     }
 
     /// Sets a callback to be used when an item is selected.
@@ -147,7 +162,9 @@ impl ListView {
     }
 
     fn iter_mut<'a>(
-        &'a mut self, from_focus: bool, source: direction::Relative,
+        &'a mut self,
+        from_focus: bool,
+        source: direction::Relative,
     ) -> Box<dyn Iterator<Item = (usize, &mut ListChild)> + 'a> {
         match source {
             direction::Relative::Front => {
@@ -167,7 +184,9 @@ impl ListView {
     }
 
     fn move_focus(
-        &mut self, n: usize, source: direction::Direction,
+        &mut self,
+        n: usize,
+        source: direction::Direction,
     ) -> EventResult {
         let i = if let Some(i) = source
             .relative(direction::Orientation::Vertical)
@@ -236,7 +255,8 @@ impl ListView {
 }
 
 fn try_focus(
-    (i, child): (usize, &mut ListChild), source: direction::Direction,
+    (i, child): (usize, &mut ListChild),
+    source: direction::Direction,
 ) -> Option<usize> {
     match *child {
         ListChild::Delimiter => None,
@@ -380,10 +400,12 @@ impl View for ListView {
     }
 
     fn call_on_any<'a>(
-        &mut self, selector: &Selector<'_>, mut callback: AnyCb<'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         for view in self.children.iter_mut().filter_map(ListChild::view) {
-            view.call_on_any(selector, Box::new(|any| callback(any)));
+            view.call_on_any(selector, callback);
         }
     }
 

@@ -3,13 +3,28 @@ use crate::event::{
     Callback, Event, EventResult, Key, MouseButton, MouseEvent,
 };
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::View;
+use crate::Vec2;
 use crate::With;
 use crate::{Cursive, Printer};
 use std::rc::Rc;
 
 /// A horizontal or vertical slider.
+///
+/// # Examples
+///
+/// ```
+/// use cursive::views::{Dialog, SliderView};
+///
+/// let slider_view = SliderView::horizontal(10)
+///     .on_change(|s, n| if n == 5 {
+///         s.add_layer(Dialog::info("5! Pick 5!"));
+///     })
+///     .on_enter(|s, n| match n {
+///         5 => s.add_layer(Dialog::info("You did it!")),
+///         n => s.add_layer(Dialog::info(format!("Why {}? Why not 5?", n))),
+///     });
+/// ```
 pub struct SliderView {
     orientation: Orientation,
     on_change: Option<Rc<dyn Fn(&mut Cursive, usize)>>,
@@ -24,6 +39,8 @@ impl SliderView {
     ///
     /// The view will have a fixed length of `max_value`,
     /// with one tick per block.
+    ///
+    /// The actual range of values for this slider is `[0, max_value - 1]`.
     pub fn new(orientation: Orientation, max_value: usize) -> Self {
         SliderView {
             orientation,

@@ -1,8 +1,7 @@
-use crate::vec::Vec2;
+use crate::event::AnyCb;
 use crate::view::{Selector, View, ViewWrapper};
+use crate::Vec2;
 use crate::With;
-
-use std::any::Any;
 
 /// Wrapper around another view that can be hidden at will.
 ///
@@ -91,8 +90,9 @@ impl<V: View> ViewWrapper for HideableView<V> {
     }
 
     fn wrap_call_on_any<'a>(
-        &mut self, selector: &Selector<'_>,
-        callback: Box<dyn FnMut(&mut dyn Any) + 'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         // We always run callbacks, even when invisible.
         self.view.call_on_any(selector, callback)

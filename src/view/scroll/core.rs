@@ -5,9 +5,9 @@ use crate::event::{AnyCb, Event, EventResult, Key, MouseButton, MouseEvent};
 use crate::printer::Printer;
 use crate::rect::Rect;
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::{ScrollStrategy, Selector, SizeCache};
 use crate::with::With;
+use crate::Vec2;
 use crate::XY;
 
 /// Describes an item with a scroll core.
@@ -22,6 +22,36 @@ pub trait Scroller {
 
     /// Returns an immutable access to the scroll core.
     fn get_scroller(&self) -> &Core;
+}
+
+/// Implements the `Scroller` trait for any type.
+#[macro_export]
+macro_rules! impl_scroller {
+    ($class:ident :: $core:ident) => {
+        impl $crate::view::scroll::Scroller for $class {
+            fn get_scroller_mut(
+                &mut self,
+            ) -> &mut $crate::view::scroll::Core {
+                &mut self.$core
+            }
+            fn get_scroller(&self) -> &$crate::view::scroll::Core {
+                &self.$core
+            }
+        }
+    };
+    ($class:ident < $($args:tt),* > :: $core:ident) => {
+        impl <$( $args ),* > $crate::view::scroll::Scroller for $class<$($args),*> {
+
+            fn get_scroller_mut(
+                &mut self,
+            ) -> &mut $crate::view::scroll::Core {
+                &mut self.$core
+            }
+            fn get_scroller(&self) -> &$crate::view::scroll::Core {
+                &self.$core
+            }
+        }
+    };
 }
 
 /// Core system for scrolling views.
@@ -101,56 +131,60 @@ impl Core {
         printer: &Printer<'a, 'b>,
     ) -> Printer<'a, 'b> {
         // Draw scrollbar?
-        let scrolling = self.is_scrolling();
-
-        let lengths = self.scrollbar_thumb_lengths();
-        let offsets = self.scrollbar_thumb_offsets(lengths);
-
-        let line_c = XY::new("-", "|");
-
-        let color = if printer.focused {
-            ColorStyle::highlight()
-        } else {
-            ColorStyle::highlight_inactive()
-        };
 
         let size = self.available_size();
 
         // Draw the scrollbars
-        XY::zip5(lengths, offsets, size, line_c, Orientation::pair()).run_if(
-            scrolling,
-            |(length, offset, size, c, orientation)| {
-                let start = printer
-                    .size
-                    .saturating_sub((1, 1))
-                    .with_axis(orientation, 0);
-                let offset = orientation.make_vec(offset, 0);
+        if self.get_show_scrollbars() {
+            let scrolling = self.is_scrolling();
 
-                printer.print_line(orientation, start, size, c);
+            let lengths = self.scrollbar_thumb_lengths();
+            let offsets = self.scrollbar_thumb_offsets(lengths);
 
-                let thumb_c = if self
-                    .thumb_grab
-                    .map(|(o, _)| o == orientation)
-                    .unwrap_or(false)
-                {
-                    " "
-                } else {
-                    "▒"
-                };
-                printer.with_color(color, |printer| {
-                    printer.print_line(
-                        orientation,
-                        start + offset,
-                        length,
-                        thumb_c,
-                    );
-                });
-            },
-        );
+            let line_c = XY::new("-", "|");
 
-        // Draw the X between the two scrollbars.
-        if scrolling.both() {
-            printer.print(printer.size.saturating_sub((1, 1)), "╳");
+            let color = if printer.focused {
+                ColorStyle::highlight()
+            } else {
+                ColorStyle::highlight_inactive()
+            };
+
+            XY::zip5(lengths, offsets, size, line_c, Orientation::pair())
+                .run_if(
+                    scrolling,
+                    |(length, offset, size, c, orientation)| {
+                        let start = printer
+                            .size
+                            .saturating_sub((1, 1))
+                            .with_axis(orientation, 0);
+                        let offset = orientation.make_vec(offset, 0);
+
+                        printer.print_line(orientation, start, size, c);
+
+                        let thumb_c = if self
+                            .thumb_grab
+                            .map(|(o, _)| o == orientation)
+                            .unwrap_or(false)
+                        {
+                            " "
+                        } else {
+                            "▒"
+                        };
+                        printer.with_color(color, |printer| {
+                            printer.print_line(
+                                orientation,
+                                start + offset,
+                                length,
+                                thumb_c,
+                            );
+                        });
+                    },
+                );
+
+            // Draw the X between the two scrollbars.
+            if scrolling.both() {
+                printer.print(printer.size.saturating_sub((1, 1)), "╳");
+            }
         }
 
         // Draw content
@@ -303,22 +337,7 @@ impl Core {
             other => {
                 // The view consumed the event. Maybe something changed?
 
-                // Fix offset?
-                let important = important_area;
-
-                // The furthest top-left we can go
-                let top_left = (important.bottom_right() + (1, 1))
-                    .saturating_sub(self.available_size());
-                // The furthest bottom-right we can go
-                let bottom_right = important.top_left();
-
-                // "top_left < bottom_right" is NOT guaranteed
-                // if the child is larger than the view.
-                let offset_min = Vec2::min(top_left, bottom_right);
-                let offset_max = Vec2::max(top_left, bottom_right);
-
-                self.offset =
-                    self.offset.or_max(offset_min).or_min(offset_max);
+                self.scroll_to_rect(important_area);
 
                 other
             }
@@ -518,6 +537,22 @@ impl Core {
         let (min, max) = (Vec2::min(min, max), Vec2::max(min, max));
 
         self.offset = self.offset.or_min(max).or_max(min);
+    }
+
+    /// Scrolls until the given rect is in view.
+    pub fn scroll_to_rect(&mut self, important_area: Rect) {
+        // The furthest top-left we can go
+        let top_left = (important_area.bottom_right() + (1, 1))
+            .saturating_sub(self.available_size());
+        // The furthest bottom-right we can go
+        let bottom_right = important_area.top_left();
+
+        // "top_left < bottom_right" is NOT guaranteed
+        // if the child is larger than the view.
+        let offset_min = Vec2::min(top_left, bottom_right);
+        let offset_max = Vec2::max(top_left, bottom_right);
+
+        self.offset = self.offset.or_max(offset_min).or_min(offset_max);
     }
 
     /// Scroll until the given point is visible.

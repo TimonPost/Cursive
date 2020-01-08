@@ -4,18 +4,24 @@ use crate::event::{
 };
 use crate::menu::{MenuItem, MenuTree};
 use crate::rect::Rect;
-use crate::vec::Vec2;
 use crate::view::scroll;
 use crate::view::{Position, View};
 use crate::views::OnEventView;
 use crate::Cursive;
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use std::cmp::min;
 use std::rc::Rc;
 use unicode_width::UnicodeWidthStr;
 
 /// Popup that shows a list of items.
+///
+/// This is mostly used indirectly when creating a [popup `SelectView`][1] or
+/// a [menubar][2].
+///
+/// [1]: crate::views::SelectView::popup()
+/// [2]: crate::Cursive::menubar()
 pub struct MenuPopup {
     menu: Rc<MenuTree>,
     focus: usize,
@@ -28,15 +34,7 @@ pub struct MenuPopup {
 // The `scroll::Scroller` trait is used to weave the borrow phases.
 //
 // TODO: use some macro to auto-generate this.
-impl scroll::Scroller for MenuPopup {
-    fn get_scroller(&self) -> &scroll::Core {
-        &self.scroll_core
-    }
-
-    fn get_scroller_mut(&mut self) -> &mut scroll::Core {
-        &mut self.scroll_core
-    }
-}
+impl_scroller!(MenuPopup::scroll_core);
 
 impl MenuPopup {
     /// Creates a new `MenuPopup` using the given menu tree.
@@ -261,7 +259,9 @@ impl MenuPopup {
                 if let Some(position) = position.checked_sub(offset) {
                     // Now `position` is relative to the top-left of the content.
                     let focus = position.y;
-                    if !self.menu.children[focus].is_delimiter() {
+                    if focus < self.menu.len()
+                        && !self.menu.children[focus].is_delimiter()
+                    {
                         self.focus = focus;
                     }
                 }

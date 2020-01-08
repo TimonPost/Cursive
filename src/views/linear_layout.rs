@@ -1,9 +1,9 @@
 use crate::direction;
 use crate::event::{AnyCb, Event, EventResult, Key};
 use crate::rect::Rect;
-use crate::vec::Vec2;
-use crate::view::{Selector, SizeCache, View};
+use crate::view::{IntoBoxedView, Selector, SizeCache, View};
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use crate::XY;
 use log::debug;
@@ -11,6 +11,18 @@ use std::cmp::min;
 use std::ops::Deref;
 
 /// Arranges its children linearly according to its orientation.
+///
+/// # Examples
+///
+/// ```
+/// use cursive::views::{Button, LinearLayout, TextView, TextArea};
+/// use cursive::traits::Boxable;
+///
+/// let linear_layout = LinearLayout::horizontal()
+///     .child(TextView::new("Top of the page"))
+///     .child(TextArea::new().fixed_size((20, 5)))
+///     .child(Button::new("Ok", |s| s.quit()));
+/// ```
 pub struct LinearLayout {
     children: Vec<Child>,
     orientation: direction::Orientation,
@@ -58,7 +70,9 @@ struct ChildItem<T> {
 
 impl<T> ChildIterator<T> {
     fn new(
-        inner: T, orientation: direction::Orientation, available: usize,
+        inner: T,
+        orientation: direction::Orientation,
+        available: usize,
     ) -> Self {
         ChildIterator {
             inner,
@@ -141,14 +155,14 @@ impl LinearLayout {
     /// Adds a child to the layout.
     ///
     /// Chainable variant.
-    pub fn child<V: View + 'static>(self, view: V) -> Self {
+    pub fn child<V: IntoBoxedView + 'static>(self, view: V) -> Self {
         self.with(|s| s.add_child(view))
     }
 
     /// Adds a child to the layout.
-    pub fn add_child<V: View + 'static>(&mut self, view: V) {
+    pub fn add_child<V: IntoBoxedView + 'static>(&mut self, view: V) {
         self.children.push(Child {
-            view: Box::new(view),
+            view: view.as_boxed_view(),
             size: Vec2::zero(),
             weight: 0,
         });
@@ -160,11 +174,15 @@ impl LinearLayout {
     /// # Panics
     ///
     /// Panics if `i > self.len()`.
-    pub fn insert_child<V: View + 'static>(&mut self, i: usize, view: V) {
+    pub fn insert_child<V: IntoBoxedView + 'static>(
+        &mut self,
+        i: usize,
+        view: V,
+    ) {
         self.children.insert(
             i,
             Child {
-                view: Box::new(view),
+                view: view.as_boxed_view(),
                 size: Vec2::zero(),
                 weight: 0,
             },
@@ -191,6 +209,24 @@ impl LinearLayout {
     /// Returns index of focused inner view
     pub fn get_focus_index(&self) -> usize {
         self.focus
+    }
+
+    /// Attemps to set the focus on the given child.
+    ///
+    /// Returns `Err(())` if `index >= self.len()`, or if the view at the
+    /// given index does not accept focus.
+    pub fn set_focus_index(&mut self, index: usize) -> Result<(), ()> {
+        if self
+            .children
+            .get_mut(index)
+            .map(|child| child.view.take_focus(direction::Direction::none()))
+            .unwrap_or(false)
+        {
+            self.focus = index;
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 
     // Invalidate the view, to request a layout next time
@@ -272,7 +308,9 @@ impl LinearLayout {
 
     /// Returns a cyclic mutable iterator starting with the child in focus
     fn iter_mut<'a>(
-        &'a mut self, from_focus: bool, source: direction::Relative,
+        &'a mut self,
+        from_focus: bool,
+        source: direction::Relative,
     ) -> Box<dyn Iterator<Item = (usize, &mut Child)> + 'a> {
         match source {
             direction::Relative::Front => {
@@ -291,26 +329,29 @@ impl LinearLayout {
         }
     }
 
+    // Attempt to move the focus, coming from the given direction.
+    //
+    // Consumes the event if the focus was moved, otherwise ignores it.
     fn move_focus(&mut self, source: direction::Direction) -> EventResult {
-        let i = if let Some(i) =
-            source.relative(self.orientation).and_then(|rel| {
+        source
+            .relative(self.orientation)
+            .and_then(|rel| {
                 // The iterator starts at the focused element.
                 // We don't want that one.
                 self.iter_mut(true, rel)
                     .skip(1)
                     .filter_map(|p| try_focus(p, source))
                     .next()
-            }) {
-            i
-        } else {
-            return EventResult::Ignored;
-        };
-        self.focus = i;
-        EventResult::Consumed(None)
+            })
+            .map_or(EventResult::Ignored, |i| {
+                self.focus = i;
+                EventResult::Consumed(None)
+            })
     }
 
-    // If the event is a mouse event,
-    // move the focus to the selected view if needed.
+    // Move the focus to the selected view if needed.
+    //
+    // Does nothing if the event is not a `MouseEvent`.
     fn check_focus_grab(&mut self, event: &Event) {
         if let Event::Mouse {
             offset,
@@ -358,7 +399,8 @@ impl LinearLayout {
 }
 
 fn try_focus(
-    (i, child): (usize, &mut Child), source: direction::Direction,
+    (i, child): (usize, &mut Child),
+    source: direction::Direction,
 ) -> Option<usize> {
     if child.view.take_focus(source) {
         Some(i)
@@ -632,12 +674,12 @@ impl View for LinearLayout {
     }
 
     fn call_on_any<'a>(
-        &mut self, selector: &Selector<'_>, mut callback: AnyCb<'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         for child in &mut self.children {
-            child
-                .view
-                .call_on_any(selector, Box::new(|any| callback(any)));
+            child.view.call_on_any(selector, callback);
         }
     }
 

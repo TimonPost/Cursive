@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.14.0 (Next version)
+
+### Breaking changes
+
+- `cursive::event::AnyCb` changed from `Box<...>` to `&mut ...`, so users of
+  `View::call_on_any` no longer need to box their closures.
+- Remove `BoxView::squishable`.
+- Update crossterm to 0.14.
+- Renamed multiple types (old names are still re-exported, but deprecated):
+    - `BoxView` -> `ResizedView`
+    - `ViewBox` -> `BoxedView`
+    - `SizedView` -> `LastSizeView`
+    - `Identifiable` -> `Nameable`
+    - `Boxable` -> `Resizable`
+    - `IdView` -> `NamedView`
+    - `Selector::Id` -> `Selector::Name`
+    - `with_id` -> `with_name`
+    - `call_on_id` -> `call_on_name`
+    - `find_id` -> `find_name`
+    - `focus_id` -> `focus_name`
+
+### API updates
+
+- `SelectView::{item, with_all}` now accept `S: Into<StyledString>` for colored labels.
+- Add `ScrollView::scroll_to_important_area`.
+- Add `LinearLayout::set_focus_index`.
+- Add `XY::{sum, product}`.
+- `view::scroll` is now a public module.
+- Add `Cursive::process_events` and `Cursive::post_events`.
+    - This gives users finer control than `Cursive::step`.
+- `Layer` now has a `color` option.
+- `LinearLayout` can now directly add boxed views without re-boxing.
+- Add inner getters to `EnableableView`.
+- Add `PaddedView::get_inner(_mut)`.
+
+### Improvements
+
+- Changed the default color for `TitleSecondary` from yellow to light blue.
+- Changed the default color for `Tertiary` from grey to white.
+- Reduced dependencies (`toml` is now optional, removed `hashbrown`).
+- `Cursive::default()` now fallbacks do dummy backend if no other is available.
+
+### Bugfixes
+
+- Fixed `ScrollView::show_scrollbars()`
+- Fixed layout for `BoxView` with some size constraints.
+- On Windows, do not print unix-specific character during initialization.
+- Fix out-of-bounds access for some mouse events in `MenuPopup`
+
+## 0.13.0
+
+### Breaking changes
+
+- Update `enum-map` fron 0.5 to 0.6
+
+### API updates
+
+- Add `Effect::Strikethrough` (not supported on ncurses)
+- Add `ListView::remove_child`
+- Replace `xursive::CbFunc` with `Box<FnOnce>`
+- Add `ScrollView::{inner_size, is_as_{bottom, top, left, right} }`
+- Add getters for current value in `SliderView`
+- More fields made public in `cursive::logger`
+- Add a "puppet" backend for testing and instrumentation
+
+### Improvements
+
+- Performance improvements for the crossterm backend
+
+### Bugfixes
+
+- Fix a possible panic when a TextView is updated asynchronously while it's
+  being layed out.
+- Fixed weird behaviour of `SizeConstraint::Full` with `ScrollView`.
+
 ## 0.12.0
 
 ### Breaking changes

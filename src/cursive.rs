@@ -1,6 +1,6 @@
-use hashbrown::HashMap;
 use std::any::Any;
 use std::num::NonZeroU32;
+#[cfg(feature = "toml")]
 use std::path::Path;
 use std::time::Duration;
 
@@ -11,20 +11,23 @@ use crate::direction;
 use crate::event::{Callback, Event, EventResult};
 use crate::printer::Printer;
 use crate::theme;
-use crate::vec::Vec2;
 use crate::view::{self, Finder, IntoBoxedView, Position, View};
 use crate::views::{self, LayerPosition};
+use crate::Vec2;
 
-static DEBUG_VIEW_ID: &'static str = "_cursive_debug_view";
+static DEBUG_VIEW_NAME: &str = "_cursive_debug_view";
 
 // How long we wait between two empty input polls
 const INPUT_POLL_DELAY_MS: u64 = 30;
 
+// Use AHash instead of the slower SipHash
+type HashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
+
 /// Central part of the cursive library.
 ///
 /// It initializes ncurses on creation and cleans up on drop.
-/// To use it, you should populate it with views, layouts and callbacks,
-/// then start the event loop with run().
+/// To use it, you should populate it with views, layouts, and callbacks,
+/// then start the event loop with `run()`.
 ///
 /// It uses a list of screen, with one screen active at a time.
 pub struct Cursive {
@@ -57,6 +60,14 @@ pub struct Cursive {
 pub type ScreenId = usize;
 
 /// Convenient alias to the result of `Cursive::cb_sink`.
+///
+/// # Notes
+///
+/// Callbacks need to be `Send`, which can be limiting in some cases.
+///
+/// In some case [`send_wrapper`] may help you work around that.
+///
+/// [`send_wrapper`]: https://crates.io/crates/send_wrapper
 pub type CbSink = Sender<Box<dyn FnOnce(&mut Cursive) + Send>>;
 
 cfg_if::cfg_if! {
@@ -94,6 +105,13 @@ cfg_if::cfg_if! {
         impl Default for Cursive {
             fn default() -> Self {
                 Self::ncurses().unwrap()
+            }
+        }
+    } else {
+        impl Default for Cursive {
+            fn default() -> Self {
+                log::warn!("No built-it backend, falling back to Cursive::dummy().");
+                Self::dummy()
             }
         }
     }
@@ -143,7 +161,7 @@ impl Cursive {
             theme,
             screens: vec![views::StackView::new()],
             last_sizes: Vec::new(),
-            global_callbacks: HashMap::new(),
+            global_callbacks: HashMap::default(),
             menubar: views::Menubar::new(),
             active_screen: 0,
             running: true,
@@ -176,7 +194,7 @@ impl Cursive {
 
     /// Creates a new Cursive root using a crossterm backend.
     #[cfg(feature = "crossterm-backend")]
-    pub fn crossterm() -> std::io::Result<Self> {
+    pub fn crossterm() -> Result<Self, crossterm::ErrorKind> {
         Self::try_new(backend::crossterm::Backend::init)
     }
 
@@ -280,8 +298,8 @@ impl Cursive {
     pub fn show_debug_console(&mut self) {
         self.add_layer(
             views::Dialog::around(
-                views::ScrollView::new(views::IdView::new(
-                    DEBUG_VIEW_ID,
+                views::ScrollView::new(views::NamedView::new(
+                    DEBUG_VIEW_NAME,
                     views::DebugView::new(),
                 ))
                 .scroll_x(true),
@@ -300,7 +318,8 @@ impl Cursive {
     /// siv.add_global_callback('~', Cursive::toggle_debug_console);
     /// ```
     pub fn toggle_debug_console(&mut self) {
-        if let Some(pos) = self.screen_mut().find_layer_from_id(DEBUG_VIEW_ID)
+        if let Some(pos) =
+            self.screen_mut().find_layer_from_name(DEBUG_VIEW_NAME)
         {
             self.screen_mut().remove_layer(pos);
         } else {
@@ -316,16 +335,22 @@ impl Cursive {
     /// Callbacks will be executed in the order
     /// of arrival on the next event cycle.
     ///
+    /// # Notes
+    ///
+    /// Callbacks need to be `Send`, which can be limiting in some cases.
+    ///
+    /// In some case [`send_wrapper`] may help you work around that.
+    ///
+    /// [`send_wrapper`]: https://crates.io/crates/send_wrapper
+    ///
     /// # Examples
     ///
     /// ```rust
     /// # use cursive::*;
-    /// # fn main() {
     /// let mut siv = Cursive::dummy();
     ///
     /// // quit() will be called during the next event cycle
     /// siv.cb_sink().send(Box::new(|s| s.quit())).unwrap();
-    /// # }
     /// ```
     pub fn cb_sink(&self) -> &CbSink {
         &self.cb_sink
@@ -356,7 +381,6 @@ impl Cursive {
     /// # use cursive::traits::*;
     /// # use cursive::menu::*;
     /// #
-    /// # fn main() {
     /// let mut siv = Cursive::dummy();
     ///
     /// siv.menubar()
@@ -390,7 +414,6 @@ impl Cursive {
     ///                   |s| s.add_layer(Dialog::info("Cursive v0.0.0"))));
     ///
     /// siv.add_global_callback(event::Key::Esc, |s| s.select_menubar());
-    /// # }
     /// ```
     pub fn menubar(&mut self) -> &mut views::Menubar {
         &mut self.menubar
@@ -415,18 +438,25 @@ impl Cursive {
             .clear(self.theme.palette[theme::PaletteColor::Background]);
     }
 
+    #[cfg(feature = "toml")]
     /// Loads a theme from the given file.
     ///
     /// `filename` must point to a valid toml file.
+    ///
+    /// Must have the `toml` feature enabled.
     pub fn load_theme_file<P: AsRef<Path>>(
-        &mut self, filename: P,
+        &mut self,
+        filename: P,
     ) -> Result<(), theme::Error> {
         theme::load_theme_file(filename).map(|theme| self.set_theme(theme))
     }
 
+    #[cfg(feature = "toml")]
     /// Loads a theme from the given string content.
     ///
     /// Content must be valid toml.
+    ///
+    /// Must have the `toml` feature enabled.
     pub fn load_toml(&mut self, content: &str) -> Result<(), theme::Error> {
         theme::load_toml(content).map(|theme| self.set_theme(theme))
     }
@@ -505,26 +535,23 @@ impl Cursive {
     /// ```rust
     /// # use cursive::{Cursive, views, view};
     /// # use cursive::traits::*;
-    /// # fn main() {
-    /// fn main() {
-    ///     let mut siv = Cursive::dummy();
+    /// let mut siv = Cursive::dummy();
     ///
-    ///     siv.add_layer(views::TextView::new("Text #1").with_id("text"));
+    /// siv.add_layer(views::TextView::new("Text #1").with_name("text"));
     ///
-    ///     siv.add_global_callback('p', |s| {
-    ///         s.call_on(
-    ///             &view::Selector::Id("text"),
-    ///             |view: &mut views::TextView| {
-    ///                 view.set_content("Text #2");
-    ///             },
-    ///         );
-    ///     });
-    ///
-    /// }
-    /// # }
+    /// siv.add_global_callback('p', |s| {
+    ///     s.call_on(
+    ///         &view::Selector::Id("text"),
+    ///         |view: &mut views::TextView| {
+    ///             view.set_content("Text #2");
+    ///         },
+    ///     );
+    /// });
     /// ```
     pub fn call_on<V, F, R>(
-        &mut self, sel: &view::Selector<'_>, callback: F,
+        &mut self,
+        sel: &view::Selector<'_>,
+        callback: F,
     ) -> Option<R>
     where
         V: View + Any,
@@ -542,30 +569,42 @@ impl Cursive {
     /// ```rust
     /// # use cursive::{Cursive, views};
     /// # use cursive::traits::*;
-    /// # fn main() {
     /// let mut siv = Cursive::dummy();
     ///
     /// siv.add_layer(views::TextView::new("Text #1")
-    ///                               .with_id("text"));
+    ///                               .with_name("text"));
     ///
     /// siv.add_global_callback('p', |s| {
-    ///     s.call_on_id("text", |view: &mut views::TextView| {
+    ///     s.call_on_name("text", |view: &mut views::TextView| {
     ///         view.set_content("Text #2");
     ///     });
     /// });
-    /// # }
     /// ```
+    pub fn call_on_name<V, F, R>(
+        &mut self,
+        name: &str,
+        callback: F,
+    ) -> Option<R>
+    where
+        V: View + Any,
+        F: FnOnce(&mut V) -> R,
+    {
+        self.call_on(&view::Selector::Name(name), callback)
+    }
+
+    /// Same as [`call_on_name`](Cursive::call_on_name).
+    #[deprecated(note = "`call_on_id` is being renamed to `call_on_name`")]
     pub fn call_on_id<V, F, R>(&mut self, id: &str, callback: F) -> Option<R>
     where
         V: View + Any,
         F: FnOnce(&mut V) -> R,
     {
-        self.call_on(&view::Selector::Id(id), callback)
+        self.call_on_name(id, callback)
     }
 
-    /// Convenient method to find a view wrapped in [`IdView`].
+    /// Convenient method to find a view wrapped in [`NamedView`].
     ///
-    /// This looks for a `IdView<V>` with the given ID, and return
+    /// This looks for a `NamedView<V>` with the given name, and return
     /// a [`ViewRef`] to the wrapped view. The `ViewRef` implements
     /// `DerefMut<Target=T>`, so you can treat it just like a `&mut T`.
     ///
@@ -577,10 +616,10 @@ impl Cursive {
     /// # let mut siv = Cursive::dummy();
     /// use cursive::traits::Identifiable;
     ///
-    /// siv.add_layer(TextView::new("foo").with_id("id"));
+    /// siv.add_layer(TextView::new("foo").with_name("id"));
     ///
     /// // Could be called in a callback
-    /// let mut view: ViewRef<TextView> = siv.find_id("id").unwrap();
+    /// let mut view: ViewRef<TextView> = siv.find_name("id").unwrap();
     /// view.set_content("bar");
     /// ```
     ///
@@ -594,32 +633,47 @@ impl Cursive {
     /// use cursive::traits::Identifiable;
     ///
     /// let select = SelectView::new().item("zero", 0u32).item("one", 1u32);
-    /// siv.add_layer(select.with_id("select"));
+    /// siv.add_layer(select.with_name("select"));
     ///
     /// // Specifying a wrong type will not return anything.
-    /// assert!(siv.find_id::<SelectView<String>>("select").is_none());
+    /// assert!(siv.find_name::<SelectView<String>>("select").is_none());
     ///
     /// // Omitting the type will use the default type, in this case `String`.
-    /// assert!(siv.find_id::<SelectView>("select").is_none());
+    /// assert!(siv.find_name::<SelectView>("select").is_none());
     ///
     /// // But with the correct type, it works fine.
-    /// assert!(siv.find_id::<SelectView<u32>>("select").is_some());
+    /// assert!(siv.find_name::<SelectView<u32>>("select").is_some());
     /// ```
     ///
-    /// [`IdView`]: views/struct.IdView.html
-    /// [`ViewRef`]: views/type.ViewRef.html
+    /// [`NamedView`]: views::NamedView
+    /// [`ViewRef`]: views::ViewRef
+    pub fn find_name<V>(&mut self, id: &str) -> Option<views::ViewRef<V>>
+    where
+        V: View + Any,
+    {
+        self.call_on_name(id, views::NamedView::<V>::get_mut)
+    }
+
+    /// Same as [`find_name`](Cursive::find_name).
+    #[deprecated(note = "`find_id` is being renamed to `find_name`")]
     pub fn find_id<V>(&mut self, id: &str) -> Option<views::ViewRef<V>>
     where
         V: View + Any,
     {
-        self.call_on_id(id, views::IdView::<V>::get_mut)
+        self.find_name(id)
     }
 
-    /// Moves the focus to the view identified by `id`.
+    /// Moves the focus to the view identified by `name`.
     ///
-    /// Convenient method to call `focus` with a `view::Selector::Id`.
+    /// Convenient method to call `focus` with a [`view::Selector::Name`].
+    pub fn focus_name(&mut self, name: &str) -> Result<(), ()> {
+        self.focus(&view::Selector::Name(name))
+    }
+
+    /// Same as [`focus_name`](Cursive::focus_name).
+    #[deprecated(note = "`focus_id` is being renamed to `focus_name`")]
     pub fn focus_id(&mut self, id: &str) -> Result<(), ()> {
-        self.focus(&view::Selector::Id(id))
+        self.focus(&view::Selector::Name(id))
     }
 
     /// Moves the focus to the view identified by `sel`.
@@ -635,11 +689,9 @@ impl Cursive {
     ///
     /// ```rust
     /// # use cursive::*;
-    /// # fn main() {
     /// let mut siv = Cursive::dummy();
     ///
     /// siv.add_global_callback('q', |s| s.quit());
-    /// # }
     /// ```
     pub fn add_global_callback<F, E: Into<Event>>(&mut self, event: E, cb: F)
     where
@@ -656,13 +708,11 @@ impl Cursive {
     /// # Examples
     ///
     /// ```rust
-    /// # use cursive::*;
-    /// # fn main() {
+    /// use cursive::Cursive;
     /// let mut siv = Cursive::dummy();
     ///
     /// siv.add_global_callback('q', |s| s.quit());
     /// siv.clear_global_callbacks('q');
-    /// # }
     /// ```
     pub fn clear_global_callbacks<E>(&mut self, event: E)
     where
@@ -677,12 +727,10 @@ impl Cursive {
     /// # Examples
     ///
     /// ```rust
-    /// # use cursive::*;
-    /// # fn main() {
+    /// use cursive::{Cursive, views};
     /// let mut siv = Cursive::dummy();
     ///
     /// siv.add_layer(views::TextView::new("Hello world!"));
-    /// # }
     /// ```
     pub fn add_layer<T>(&mut self, view: T)
     where
@@ -708,7 +756,9 @@ impl Cursive {
 
     /// Convenient stub forwarding layer repositioning.
     pub fn reposition_layer(
-        &mut self, layer: LayerPosition, position: Position,
+        &mut self,
+        layer: LayerPosition,
+        position: Position,
     ) {
         self.screen_mut().reposition_layer(layer, position);
     }
@@ -827,10 +877,11 @@ impl Cursive {
     /// It will wait for user input (key presses)
     /// and trigger callbacks accordingly.
     ///
-    /// Calls [`step(&mut self)`] until [`quit(&mut self)`] is called.
+    /// Internally, it calls [`step(&mut self)`] until [`quit(&mut self)`] is
+    /// called.
     ///
-    /// After this function returns, you can call
-    /// it again and it will start a new loop.
+    /// After this function returns, you can call it again and it will start a
+    /// new loop.
     ///
     /// [`step(&mut self)`]: #method.step
     /// [`quit(&mut self)`]: #method.quit
@@ -855,6 +906,27 @@ impl Cursive {
     ///
     /// [`run(&mut self)`]: #method.run
     pub fn step(&mut self) -> bool {
+        let received_something = self.process_events();
+        self.post_events(received_something);
+        received_something
+    }
+
+    /// Performs the first half of `Self::step()`.
+    ///
+    /// This is an advanced method for fine-tuned manual stepping;
+    /// you probably want [`run`][1] or [`step`][2].
+    ///
+    /// This processes any pending event or callback. After calling this,
+    /// you will want to call [`post_events`][3] with the result from this
+    /// function.
+    ///
+    /// Returns `true` if an event or callback was received,
+    /// and `false` otherwise.
+    ///
+    /// [1]: Cursive::run()
+    /// [2]: Cursive::step()
+    /// [3]: Cursive::post_events()
+    pub fn process_events(&mut self) -> bool {
         // Things are boring if nothing significant happened.
         let mut boring = true;
 
@@ -878,6 +950,21 @@ impl Cursive {
             }
         }
 
+        !boring
+    }
+
+    /// Performs the second half of `Self::step()`.
+    ///
+    /// This is an advanced method for fine-tuned manual stepping;
+    /// you probably want [`run`][1] or [`step`][2].
+    ///
+    /// You should call this after [`process_events`][3].
+    ///
+    /// [1]: Cursive::run()
+    /// [2]: Cursive::step()
+    /// [3]: Cursive::process_events()
+    pub fn post_events(&mut self, received_something: bool) {
+        let boring = !received_something;
         // How many times should we try if it's still boring?
         // Total duration will be INPUT_POLL_DELAY_MS * repeats
         // So effectively fps = 1000 / INPUT_POLL_DELAY_MS / repeats
@@ -902,8 +989,6 @@ impl Cursive {
             std::thread::sleep(Duration::from_millis(INPUT_POLL_DELAY_MS));
             self.boring_frame_count += 1;
         }
-
-        !boring
     }
 
     /// Refresh the screen with the current view tree state.

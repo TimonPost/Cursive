@@ -11,6 +11,8 @@ pub enum Effect {
     Bold,
     /// Prints foreground in italic
     Italic,
+    /// Prints foreground with strikethrough (has no effect for ncurses and blt backends)
+    Strikethrough,
     /// Prints foreground with underline
     Underline,
 }

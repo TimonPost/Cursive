@@ -2,9 +2,9 @@ use crate::align::*;
 use crate::event::{Event, EventResult};
 use crate::rect::Rect;
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::{View, ViewWrapper};
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use unicode_width::UnicodeWidthStr;
 
@@ -34,8 +34,6 @@ impl<V: View> Panel<V> {
             invalidated: true,
         }
     }
-
-    inner_getters!(self.view: V);
 
     /// Sets the title of the dialog.
     ///
@@ -88,6 +86,8 @@ impl<V: View> Panel<V> {
     fn invalidate(&mut self) {
         self.invalidated = true;
     }
+
+    inner_getters!(self.view: V);
 }
 
 impl<V: View> ViewWrapper for Panel<V> {

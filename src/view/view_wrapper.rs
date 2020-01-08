@@ -1,10 +1,9 @@
 use crate::direction::Direction;
 use crate::event::{AnyCb, Event, EventResult};
 use crate::rect::Rect;
-use crate::vec::Vec2;
 use crate::view::{Selector, View};
 use crate::Printer;
-use std::any::Any;
+use crate::Vec2;
 
 /// Generic wrapper around a view.
 ///
@@ -18,8 +17,6 @@ use std::any::Any;
 /// You can also override any of the `wrap_*` methods for more specific
 /// behaviors (the default implementations simply forwards the calls to the
 /// child view).
-///
-/// [`wrap_impl!`]: ../macro.wrap_impl.html
 pub trait ViewWrapper: 'static {
     /// Type that this view wraps.
     type V: View + ?Sized;
@@ -79,7 +76,9 @@ pub trait ViewWrapper: 'static {
 
     /// Wraps the `find` method.
     fn wrap_call_on_any<'a>(
-        &mut self, selector: &Selector<'_>, callback: AnyCb<'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         self.with_view_mut(|v| v.call_on_any(selector, callback));
     }
@@ -125,8 +124,9 @@ impl<T: ViewWrapper> View for T {
     }
 
     fn call_on_any<'a>(
-        &mut self, selector: &Selector<'_>,
-        callback: Box<dyn FnMut(&mut dyn Any) + 'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         self.wrap_call_on_any(selector, callback)
     }
@@ -149,7 +149,7 @@ impl<T: ViewWrapper> View for T {
 /// It defines the `with_view` and `with_view_mut` implementations,
 /// as well as the `type V` declaration.
 ///
-/// [`ViewWrapper`]: view/trait.ViewWrapper.html
+/// [`ViewWrapper`]: crate::view::ViewWrapper
 ///
 /// # Examples
 ///
@@ -192,8 +192,8 @@ macro_rules! wrap_impl {
 ///
 /// It defines the `get_inner` and `get_inner_mut` implementations.
 ///
-/// [`ViewWrapper`]: view/trait.ViewWrapper.html
-/// [`View`]: view/trait.View.html
+/// [`ViewWrapper`]: crate::view::ViewWrapper
+/// [`View`]: crate::View
 ///
 /// # Examples
 ///

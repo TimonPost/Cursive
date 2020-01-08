@@ -2,9 +2,6 @@
 //!
 //! This module defines two main concepts: [`Orientation`] and [`Direction`].
 //!
-//! [`Orientation`]: direction::Orientation
-//! [`Direction`]: direction::Direction
-//!
 //! ### Orientation
 //!
 //! `Orientation` is a simple enum that can take two values:
@@ -26,7 +23,7 @@
 //!   `Tab` key would usually cycle focus in the "front" direction, while
 //!   using the arrow keys would use absolute directions instead.
 
-use crate::vec::Vec2;
+use crate::Vec2;
 use crate::XY;
 
 /// Describes a vertical or horizontal orientation for a view.
@@ -103,7 +100,7 @@ impl Orientation {
     ///
     /// ```rust
     /// # use cursive::direction::Orientation;
-    /// # use cursive::vec::Vec2;
+    /// # use cursive::Vec2;
     /// let o = Orientation::Horizontal;
     /// let vec = o.make_vec(1, 2);
     ///

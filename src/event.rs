@@ -1,20 +1,19 @@
 //! User-input events and their effects.
 //!
-//! * Every user input the application receives is converted to an
-//!   [`Event`](./enum.Event.html).
+//! * Every user input the application receives is converted to an [`Event`].
 //! * Each event is then given to the root, and descends the view tree down to
-//!   the view currently in focus, through the
-//!   [`on_event`](../view/trait.View.html#method.on_event) method.
+//!   the view currently in focus, through the [`on_event`] method.
 //!     * If the view consumes the event, it may return a callback to be
 //!       executed.
 //!     * Otherwise, it ignores the event, and the view parent can in turn
 //!       choose to consume it or not.
-//! * If no view consumes the event, the
-//!   [global callback](../struct.Cursive.html#method.add_global_callback)
-//!   table is checked.
+//! * If no view consumes the event, the [global callback] table is checked.
+//!
+//! [`on_event`]: crate::View::on_event
+//! [global callback]: crate::Cursive::add_global_callback
 
-use crate::vec::Vec2;
 use crate::Cursive;
+use crate::Vec2;
 use std::any::Any;
 use std::cell::RefCell;
 use std::ops::Deref;
@@ -22,14 +21,20 @@ use std::rc::Rc;
 
 /// Callback is a function that can be triggered by an event.
 /// It has a mutable access to the cursive root.
+///
+/// It is meant to be stored in views.
 #[derive(Clone)]
 pub struct Callback(Rc<Box<dyn Fn(&mut Cursive)>>);
 // TODO: remove the Box when Box<T: Sized> -> Rc<T> is possible
 
-/// A boxed callback that can be run on `&mut Any`.
-pub type AnyCb<'a> = Box<dyn FnMut(&mut dyn Any) + 'a>;
+/// A callback that can be run on `&mut Any`.
+///
+/// It is meant to be used as parameter in `View::call_on_any`, and not much else.
+pub type AnyCb<'a> = &'a mut dyn FnMut(&mut dyn Any);
 
 /// A trigger that only selects some types of events.
+///
+/// It is meant to be stored in views.
 pub struct EventTrigger(Box<dyn Fn(&Event) -> bool>);
 
 impl EventTrigger {

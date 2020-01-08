@@ -3,19 +3,17 @@ use crate::direction::{Absolute, Direction, Relative};
 use crate::event::{AnyCb, Event, EventResult, Key};
 use crate::rect::Rect;
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::{Margins, Selector, View};
-use crate::views::{Button, DummyView, SizedView, TextView, ViewBox};
+use crate::views::{BoxedView, Button, DummyView, LastSizeView, TextView};
 use crate::Cursive;
 use crate::Printer;
+use crate::Vec2;
 use crate::With;
 use std::cell::Cell;
 use std::cmp::max;
 use unicode_width::UnicodeWidthStr;
 
 /// Identifies currently focused element in [`Dialog`].
-///
-/// [`Dialog`]: struct.Dialog.html
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DialogFocus {
     /// Content element focused
@@ -25,7 +23,7 @@ pub enum DialogFocus {
 }
 
 struct ChildButton {
-    button: SizedView<Button>,
+    button: LastSizeView<Button>,
     offset: Cell<Vec2>,
 }
 
@@ -35,7 +33,7 @@ impl ChildButton {
         F: 'static + Fn(&mut Cursive),
     {
         ChildButton {
-            button: SizedView::new(Button::new(label, cb)),
+            button: LastSizeView::new(Button::new(label, cb)),
             offset: Cell::new(Vec2::zero()),
         }
     }
@@ -58,7 +56,7 @@ pub struct Dialog {
     title_position: HAlign,
 
     // The actual inner view.
-    content: SizedView<ViewBox>,
+    content: LastSizeView<BoxedView>,
 
     // Optional list of buttons under the main view.
     // Include the top-left corner.
@@ -93,7 +91,7 @@ impl Dialog {
     /// Creates a new `Dialog` with the given content.
     pub fn around<V: View + 'static>(view: V) -> Self {
         Dialog {
-            content: SizedView::new(ViewBox::boxed(view)),
+            content: LastSizeView::new(BoxedView::boxed(view)),
             buttons: Vec::new(),
             title: String::new(),
             title_position: HAlign::Center,
@@ -108,6 +106,16 @@ impl Dialog {
     /// Sets the content for this dialog.
     ///
     /// Chainable variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::{Dialog, TextView};
+    ///
+    /// let dialog = Dialog::new()
+    ///         .content(TextView::new("Hello!"))
+    ///         .button("Quit", |s| s.quit());
+    /// ```
     pub fn content<V: View + 'static>(self, view: V) -> Self {
         self.with(|s| s.set_content(view))
     }
@@ -138,11 +146,20 @@ impl Dialog {
     ///
     /// Previous content will be dropped.
     pub fn set_content<V: View + 'static>(&mut self, view: V) {
-        self.content = SizedView::new(ViewBox::boxed(view));
+        self.content = LastSizeView::new(BoxedView::boxed(view));
         self.invalidate();
     }
 
     /// Convenient method to create a dialog with a simple text content.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Dialog;
+    ///
+    /// let dialog = Dialog::text("Hello!")
+    ///             .button("Quit", |s| s.quit());
+    /// ```
     pub fn text<S: Into<String>>(text: S) -> Self {
         Self::around(TextView::new(text))
     }
@@ -150,6 +167,14 @@ impl Dialog {
     /// Convenient method to create an infobox.
     ///
     /// It will contain the given text and a `Ok` dismiss button.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Dialog;
+    ///
+    /// let dialog = Dialog::info("Some very important information!");
+    /// ```
     pub fn info<S: Into<String>>(text: S) -> Self {
         Dialog::text(text).dismiss_button("Ok")
     }
@@ -217,6 +242,15 @@ impl Dialog {
     */
 
     /// Shortcut method to add a button that will dismiss the dialog.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Dialog;
+    ///
+    /// let dialog = Dialog::text("Hello!")
+    ///         .dismiss_button("Close");
+    /// ```
     pub fn dismiss_button<S: Into<String>>(self, label: S) -> Self {
         self.button(label, |s| {
             s.pop_layer();
@@ -226,6 +260,15 @@ impl Dialog {
     /// Sets the title of the dialog.
     ///
     /// If not empty, it will be visible at the top.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cursive::views::Dialog;
+    ///
+    /// let dialog = Dialog::info("Some info")
+    ///         .title("Read me!");
+    /// ```
     pub fn title<S: Into<String>>(self, label: S) -> Self {
         self.with(|s| s.set_title(label))
     }
@@ -249,6 +292,14 @@ impl Dialog {
     }
 
     /// Sets the padding in the dialog (around content and buttons).
+    ///
+    /// # Examples
+    /// ```
+    /// use cursive::views::Dialog;
+    ///
+    /// let dialog = Dialog::info("Hello!")
+    ///         .padding(((1, 1), (0, 0))); // ((Left, Right), (Top, Bottom))
+    /// ```
     pub fn padding<T: Into<Margins>>(mut self, padding: T) -> Self {
         self.padding = padding.into();
 
@@ -317,7 +368,9 @@ impl Dialog {
 
     // An event is received while a button is in focus
     fn on_event_button(
-        &mut self, event: Event, button_id: usize,
+        &mut self,
+        event: Event,
+        button_id: usize,
     ) -> EventResult {
         let result = {
             let button = &mut self.buttons[button_id];
@@ -655,7 +708,9 @@ impl View for Dialog {
     }
 
     fn call_on_any<'a>(
-        &mut self, selector: &Selector<'_>, callback: AnyCb<'a>,
+        &mut self,
+        selector: &Selector<'_>,
+        callback: AnyCb<'a>,
     ) {
         self.content.call_on_any(selector, callback);
     }

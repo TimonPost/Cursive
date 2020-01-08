@@ -3,8 +3,8 @@ use crate::event::{Event, EventResult, Key, MouseButton, MouseEvent};
 use crate::rect::Rect;
 use crate::theme::{ColorStyle, Effect};
 use crate::utils::lines::simple::{prefix, simple_prefix, LinesIterator, Row};
-use crate::vec::Vec2;
 use crate::view::{ScrollBase, SizeCache, View};
+use crate::Vec2;
 use crate::{Printer, With, XY};
 use log::debug;
 use std::cmp::min;
@@ -14,8 +14,21 @@ use unicode_width::UnicodeWidthStr;
 /// Multi-lines text editor.
 ///
 /// A `TextArea` will attempt to grow vertically and horizontally
-/// dependent on the content.  Wrap it in a `BoxView` to
+/// dependent on the content.  Wrap it in a `ResizedView` to
 /// constrain its size.
+///
+/// # Examples
+///
+/// ```
+/// use cursive::traits::{Resizable, Identifiable};
+/// use cursive::views::TextArea;
+///
+/// let text_area = TextArea::new()
+///     .content("Write description here...")
+///     .with_name("text_area")
+///     .fixed_width(30)
+///     .min_height(5);
+/// ```
 pub struct TextArea {
     // TODO: use a smarter data structure (rope?)
     content: String,
@@ -303,8 +316,8 @@ impl TextArea {
     }
 
     fn backspace(&mut self) {
-            self.move_left();
-            self.delete();
+        self.move_left();
+        self.delete();
     }
 
     fn delete(&mut self) {

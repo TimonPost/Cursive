@@ -1,9 +1,9 @@
 use crate::direction::Direction;
 use crate::event::{AnyCb, Event, EventResult};
 use crate::rect::Rect;
-use crate::vec::Vec2;
 use crate::view::{AnyView, Selector};
 use crate::Printer;
+use crate::Vec2;
 use std::any::Any;
 
 /// Main trait defining a view behaviour.
@@ -76,7 +76,7 @@ pub trait View: Any + AnyView {
     /// See [`Finder::call_on`] for a nicer interface, implemented for all
     /// views.
     ///
-    /// [`Finder::call_on`]: trait.Finder.html#method.call_on
+    /// [`Finder::call_on`]: crate::view::Finder::call_on
     ///
     /// If the selector doesn't find a match, the closure will not be run.
     ///

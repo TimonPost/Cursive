@@ -1,9 +1,9 @@
 use crate::direction::Direction;
 use crate::event::{Event, EventResult, Key, MouseButton, MouseEvent};
 use crate::theme::ColorStyle;
-use crate::vec::Vec2;
 use crate::view::View;
 use crate::Cursive;
+use crate::Vec2;
 use crate::{Printer, With};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -26,8 +26,6 @@ impl<T> SharedState<T> {
 /// A `RadioGroup` is used to create and manage [`RadioButton`]s.
 ///
 /// A `RadioGroup` can be cloned; it will keep pointing to the same group.
-///
-/// [`RadioButton`]: struct.RadioButton.html
 #[derive(Clone)]
 pub struct RadioGroup<T> {
     // Given to every child button
@@ -56,7 +54,9 @@ impl<T: 'static> RadioGroup<T> {
     ///
     /// The button will display `label` next to it, and will embed `value`.
     pub fn button<S: Into<String>>(
-        &mut self, value: T, label: S,
+        &mut self,
+        value: T,
+        label: S,
     ) -> RadioButton<T> {
         let count = self.state.borrow().values.len();
         self.state.borrow_mut().values.push(Rc::new(value));
@@ -77,7 +77,8 @@ impl<T: 'static> RadioGroup<T> {
 
     /// Sets a callback to be used when the selection changes.
     pub fn set_on_change<F: 'static + Fn(&mut Cursive, &T)>(
-        &mut self, on_change: F,
+        &mut self,
+        on_change: F,
     ) {
         self.state.borrow_mut().on_change = Some(Rc::new(on_change));
     }
@@ -86,7 +87,8 @@ impl<T: 'static> RadioGroup<T> {
     ///
     /// Chainable variant.
     pub fn on_change<F: 'static + Fn(&mut Cursive, &T)>(
-        self, on_change: F,
+        self,
+        on_change: F,
     ) -> Self {
         self.with(|s| s.set_on_change(on_change))
     }
@@ -95,7 +97,8 @@ impl<T: 'static> RadioGroup<T> {
 impl RadioGroup<String> {
     /// Adds a button, using the label itself as value.
     pub fn button_str<S: Into<String>>(
-        &mut self, text: S,
+        &mut self,
+        text: S,
     ) -> RadioButton<String> {
         let text = text.into();
         self.button(text.clone(), text)
@@ -109,10 +112,8 @@ impl RadioGroup<String> {
 /// time.
 ///
 /// `RadioButton`s are not created directly, but through
-/// [`RadioGroup::button()`].
+/// [`RadioGroup::button`].
 ///
-/// [`RadioGroup`]: struct.RadioGroup.html
-/// [`RadioGroup::button()`]: struct.RadioGroup.html#method.button
 pub struct RadioButton<T> {
     state: Rc<RefCell<SharedState<T>>>,
     id: usize,
@@ -124,7 +125,9 @@ impl<T: 'static> RadioButton<T> {
     impl_enabled!(self.enabled);
 
     fn new(
-        state: Rc<RefCell<SharedState<T>>>, id: usize, label: String,
+        state: Rc<RefCell<SharedState<T>>>,
+        id: usize,
+        label: String,
     ) -> Self {
         RadioButton {
             state,

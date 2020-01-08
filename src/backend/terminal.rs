@@ -16,6 +16,7 @@ use crate::{
 
 use terminal::{Event as TEvent, MouseButton as TMouseButton, MouseEvent as TMouseEvent, KeyCode as TKeyCode, KeyEvent as TKeyEvent, KeyModifiers as TKeyModifiers, Color as TColor, Attribute as TAttribute, Terminal, Action, Value, Retrieved, Clear};
 use std::fs::File;
+use crate::theme::Effect;
 
 impl From<TMouseButton> for MouseButton {
     fn from(button: TMouseButton) -> Self {
@@ -183,10 +184,11 @@ impl Backend {
         where
             Self: Sized,
     {
-        let terminal = Terminal::custom(File::open("/dev/tty").unwrap());
+        let terminal = Terminal::custom(File::create("/dev/tty").unwrap());
         terminal.act(Action::EnterAlternateScreen);
         terminal.act(Action::EnableRawMode).unwrap();
-        terminal.act(Action::HideCursor).unwrap();
+        terminal.act(Action::HideCursor);
+        terminal.act(Action::EnableMouseCapture);
 
         Ok(Box::new(Backend {
             current_style: Cell::new(theme::ColorPair::from_256colors(0, 0)),
@@ -196,12 +198,12 @@ impl Backend {
     }
 
     fn apply_colors(&self, colors: theme::ColorPair) {
-        self.terminal.act(Action::SetForegroundColor(TColor::from(colors.front))).unwrap();
-        self.terminal.act(Action::SetBackgroundColor(TColor::from(colors.back))).unwrap();
+        self.terminal.batch(Action::SetForegroundColor(TColor::from(colors.front))).unwrap();
+        self.terminal.batch(Action::SetBackgroundColor(TColor::from(colors.back))).unwrap();
     }
 
     fn set_attr(&self, attr: TAttribute) {
-        self.terminal.act(Action::SetAttribute(attr)).unwrap();
+        self.terminal.batch(Action::SetAttribute(attr)).unwrap();
     }
 
     fn map_key(&mut self, event: TEvent) -> Event {
@@ -231,7 +233,7 @@ impl Backend {
                         position = (x, y).into();
                     }
                     TMouseEvent::ScrollUp(x, y, _) => {
-                        event = MouseEvent::WheelDown;
+                        event = MouseEvent::WheelUp;
                         position = (x, y).into();
                     }
                 };
@@ -250,17 +252,17 @@ impl Backend {
 
 impl backend::Backend for Backend {
     fn poll_event(&mut self) -> Option<Event> {
-        match self.terminal.get(Value::Event(None)).unwrap() {
+        match self.terminal.get(Value::Event(Some(Duration::from_millis(0)))).unwrap() {
             Retrieved::Event(Some(event)) => Some(self.map_key(event)),
             _ => None
         }
     }
 
     fn finish(&mut self) {
-        self.terminal.act(Action::LeaveAlternateScreen).unwrap();
-        self.terminal.act(Action::ShowCursor).unwrap();
-        self.terminal.act(Action::DisableRawMode).unwrap();
-        self.terminal.act(Action::ResetColor).unwrap();
+        self.terminal.batch(Action::LeaveAlternateScreen).unwrap();
+        self.terminal.batch(Action::ShowCursor).unwrap();
+        self.terminal.batch(Action::DisableRawMode).unwrap();
+        self.terminal.batch(Action::ResetColor).unwrap();
     }
 
     fn refresh(&mut self) {
@@ -282,7 +284,7 @@ impl backend::Backend for Backend {
 
     fn print_at(&self, pos: Vec2, text: &str) {
         let mut lock = self.terminal.lock_mut().unwrap();
-        lock.act(Action::MoveCursorTo(pos.x as u16, pos.y as u16)).unwrap();
+        lock.batch(Action::MoveCursorTo(pos.x as u16, pos.y as u16)).unwrap();
         lock.write(text.as_bytes()).unwrap();
         lock.flush_batch().unwrap();
     }
@@ -307,7 +309,7 @@ impl backend::Backend for Backend {
             back: color,
         });
 
-        self.terminal.act(Action::ClearTerminal(Clear::All)).unwrap();
+        self.terminal.batch(Action::ClearTerminal(Clear::All)).unwrap();
     }
 
     fn set_color(&self, color: theme::ColorPair) -> theme::ColorPair {
@@ -328,6 +330,7 @@ impl backend::Backend for Backend {
             theme::Effect::Bold => self.set_attr(TAttribute::Bold),
             theme::Effect::Italic => self.set_attr(TAttribute::Italic),
             theme::Effect::Underline => self.set_attr(TAttribute::Underlined),
+            Effect::Strikethrough => self.set_attr(TAttribute::Crossed),
         }
     }
 
@@ -338,6 +341,7 @@ impl backend::Backend for Backend {
             theme::Effect::Bold => self.set_attr(TAttribute::NormalIntensity),
             theme::Effect::Italic => self.set_attr(TAttribute::ItalicOff),
             theme::Effect::Underline => self.set_attr(TAttribute::UnderlinedOff),
+            Effect::Strikethrough => self.set_attr(TAttribute::CrossedOff),
         }
     }
 

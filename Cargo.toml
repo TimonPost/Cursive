@@ -79,10 +79,10 @@ version = "0.14"
 [dependencies.terminal]
 optional = true
 path = "../terminal"
-features = ["crossterm-backend"]
+#features = ["crossterm-backend"]
 #features = ["termion-backend"]
+features = ["pancurses-backend"]
 default-features = false
-#features = ["pancurses-backend"]
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.1.10"

@@ -14,7 +14,7 @@ use crate::{
     vec::Vec2,
 };
 
-use terminal::{Event as TEvent, MouseButton as TMouseButton, MouseEvent as TMouseEvent, KeyCode as TKeyCode, KeyEvent as TKeyEvent, KeyModifiers as TKeyModifiers, Color as TColor, Attribute as TAttribute, Terminal, Action, Value, Result, ClearType};
+use terminal::{Event as TEvent, MouseButton as TMouseButton, MouseEvent as TMouseEvent, KeyCode as TKeyCode, KeyEvent as TKeyEvent, KeyModifiers as TKeyModifiers, Color as TColor, Attribute as TAttribute, Terminal, Action, Value, Retrieved, Clear};
 use std::fs::File;
 
 impl From<TMouseButton> for MouseButton {
@@ -183,8 +183,8 @@ impl Backend {
         where
             Self: Sized,
     {
-        let terminal = Terminal::custom(File::create("/dev/tty").unwrap());
-        terminal.act(Action::EnterAlternateScreen).unwrap();
+        let terminal = Terminal::custom(File::open("/dev/tty").unwrap());
+        terminal.act(Action::EnterAlternateScreen);
         terminal.act(Action::EnableRawMode).unwrap();
         terminal.act(Action::HideCursor).unwrap();
 
@@ -242,7 +242,7 @@ impl Backend {
                     offset: Vec2::zero(),
                 }
             }
-            TEvent::Resize(_, _) => Event::WindowResize,
+            TEvent::Resize => Event::WindowResize,
             TEvent::Unknown => Event::Unknown(vec![])
         }
     }
@@ -250,9 +250,8 @@ impl Backend {
 
 impl backend::Backend for Backend {
     fn poll_event(&mut self) -> Option<Event> {
-        match self.terminal.get(Value::Event(Duration::from_millis(30))).unwrap() {
-            Result::Event(event) => Some(self.map_key(event)),
-            Result::NoEvent => None,
+        match self.terminal.get(Value::Event(None)).unwrap() {
+            Retrieved::Event(Some(event)) => Some(self.map_key(event)),
             _ => None
         }
     }
@@ -265,7 +264,6 @@ impl backend::Backend for Backend {
     }
 
     fn refresh(&mut self) {
-        println!("abc");
         self.terminal.flush_batch().unwrap();
     }
 
@@ -275,7 +273,7 @@ impl backend::Backend for Backend {
     }
 
     fn screen_size(&self) -> Vec2 {
-        if let Result::TerminalSize(x, y) =  self.terminal.get(Value::TerminalSize).unwrap().into() {
+        if let Retrieved::TerminalSize(x, y) =  self.terminal.get(Value::TerminalSize).unwrap().into() {
             Vec2::new(x as usize, y as usize)
         }else {
             panic!("Not possible.");
@@ -309,7 +307,7 @@ impl backend::Backend for Backend {
             back: color,
         });
 
-        self.terminal.act(Action::ClearTerminal(ClearType::All)).unwrap();
+        self.terminal.act(Action::ClearTerminal(Clear::All)).unwrap();
     }
 
     fn set_color(&self, color: theme::ColorPair) -> theme::ColorPair {
